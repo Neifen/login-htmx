@@ -7,8 +7,6 @@ services:
     #todo use secret
     secrets:
       - dot-env
-    # environment:
-    #   - DOT_ENV_FILE=/run/secrets/.env
     # ports:
     #   - 80:1323
     hostname: backend-url

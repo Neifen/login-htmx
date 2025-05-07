@@ -61,7 +61,7 @@ func loadConfig() {
 	}
 	fmt.Println(err)
 
-	err = godotenv.Load("/run/secrets/.env")
+	err = godotenv.Load("/run/secrets/dot-env")
 	if err != nil {
 		fmt.Println(err)
 		// log.Fatal("Error loading secret .env file")
