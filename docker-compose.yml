@@ -1,8 +1,10 @@
 services:
   backend:
+    restart: always
     build:
       context: ./
       dockerfile: ./docker/Dockerfile
+    #todo use secret
     secrets:
       - db-password
     # ports:
@@ -36,6 +38,7 @@ services:
 
   proxy:
     image: nginx
+    restart: always
     volumes:
       - type: bind
         source: ./docker/proxy/nginx.conf
