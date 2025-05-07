@@ -1,0 +1,29 @@
+package view //import github.com/neifen/htmx-login/view
+
+templ Base(errMsgs, sucMsgs []string) {
+	<!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="shortcut icon" href="/static/img/favicon.png"  type="image/png">
+        <title>Login HTMX</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <script src="/static/js/htmx.min.js"></script>
+    </head>
+    <body class="bg-gray-100 flex items-center justify-center min-h-screen">
+        <div class="w-full max-w-md bg-white rounded-lg shadow-lg p-8 text-center" id="base">
+            { children... }
+            // @partials.FlashMessages(errMsgs, sucMsgs)
+        </div>
+    </body>
+    </html>
+}
+
+
+templ BuildBase(errMsgs, sucMsgs []string,
+    cmp templ.Component,){
+        @Base(errMsgs, sucMsgs){
+            @cmp
+        }
+    }

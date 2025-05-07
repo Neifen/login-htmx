@@ -1,0 +1,49 @@
+package view //import github.com/neifen/htmx-login/view
+
+templ Login() {
+    <h2 class="text-2xl font-bold text-center text-gray-800 mb-6">Login</h2>
+    <form>
+        <div class="mb-4">
+            <label for="email" class="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
+            <input 
+                type="email" 
+                id="email" 
+                name="email"
+                class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200" 
+                placeholder="Enter your email" 
+                required 
+            />
+        </div>
+        <div class="mb-6">
+            <label for="password" class="block text-sm font-medium text-gray-700 mb-2">Password</label>
+            <input 
+                type="password" 
+                id="password" 
+                name="password"
+                class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200" 
+                placeholder="Enter your password" 
+                required 
+            />
+        </div>
+        <div class="flex items-center justify-between mb-6">
+            <label class="flex items-center">
+                <input 
+                    type="checkbox" 
+                    class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" 
+                />
+                <span class="ml-2 text-sm text-gray-600">Remember me</span>
+            </label>
+            <a hx-get="/recovery" hx-target="#base" class="text-sm text-blue-600 hover:underline cursor-pointer">Forgot Password?</a>
+        </div>
+        <button 
+            hx-post="/login" hx-target="#base"
+            class="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 transition duration-200 font-medium"
+        >
+            Sign In
+        </button>
+    </form>
+    <p class="mt-6 text-center text-sm text-gray-600">
+        Don't have an account? 
+        <a hx-get="/signup" hx-target="#base" class="text-blue-600 hover:underline cursor-pointer">Sign up</a>
+    </p>
+}

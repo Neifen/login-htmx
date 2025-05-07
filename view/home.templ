@@ -1,0 +1,15 @@
+package view //import github.com/neifen/htmx-login/view
+
+templ Home(name string) {
+	<h2 class="text-2xl font-bold text-gray-800 mb-6">Welcome, { name }!</h2>
+	<p class="text-sm text-gray-600 mb-6">You are now logged in.</p>
+	<button 
+		hx-post="/logout"
+		hx-confirm="Are you sure you want to log out?"
+		hx-target="#base"
+		type="button" 
+		class="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 transition duration-200 font-medium"
+	>
+		Log Out
+	</button>
+}

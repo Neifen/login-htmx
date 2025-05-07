@@ -1,0 +1,58 @@
+services:
+  backend:
+    build:
+      context: ./
+      dockerfile: ./docker/Dockerfile
+    secrets:
+      - db-password
+    # ports:
+    #   - 80:1323
+    hostname: backend-url
+    depends_on:
+      db:
+        condition: service_healthy
+
+
+  db:
+    image: postgres
+    restart: always
+    #user: postgres
+    secrets:
+      - db-password
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=htmx-login
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD_FILE=/run/secrets/db-password
+    ports:
+      - 5432:5432
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+
+  proxy:
+    image: nginx
+    volumes:
+      - type: bind
+        source: ./docker/proxy/nginx.conf
+        target: /etc/nginx/conf.d/default.conf
+        read_only: true
+      - type: bind
+        source: ./assets/
+        target: /usr/static/assets/
+    ports:
+      - 8080:80
+    depends_on:
+      - backend
+
+
+volumes:
+  db-data:
+
+secrets:
+  db-password:
+    file: docker/db/password.txt
