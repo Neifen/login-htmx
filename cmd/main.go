@@ -1,7 +1,7 @@
 package main
 
 import (
-	"log"
+	"fmt"
 
 	"github.com/neifen/htmx-login/api/server"
 )
@@ -9,7 +9,8 @@ import (
 func main() {
 	store, err := server.NewPostGresStore()
 	if err != nil {
-		log.Fatal(err)
+		fmt.Print("didnt work to make new postgres, delete log tho")
+		// log.Fatal(err)
 	}
 
 	api := server.NewAPIHandler(":1323", store)
