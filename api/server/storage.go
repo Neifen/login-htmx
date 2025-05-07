@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 
 	"github.com/joho/godotenv"
@@ -63,8 +64,7 @@ func loadConfig() {
 
 	err = godotenv.Load("/run/secrets/dot-env")
 	if err != nil {
-		fmt.Println(err)
-		// log.Fatal("Error loading secret .env file")
+		log.Fatal("Error loading secret .env file")
 	}
 }
 
