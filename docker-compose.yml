@@ -62,4 +62,4 @@ secrets:
   db-password:
     file: docker/db/password.txt
   dot-env:
-    file: .env
+    file: ./.env

@@ -61,7 +61,7 @@ func loadConfig() {
 		return
 	}
 
-	err = godotenv.Load("run/secrets/.env")
+	err = godotenv.Load("/run/secrets/.env")
 	if err != nil {
 		log.Fatal("Error loading .env file")
 	}
