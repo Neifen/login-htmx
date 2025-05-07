@@ -1,5 +1,13 @@
 package server
 
+import (
+	// "crypto"
+	"bytes"
+	"errors"
+
+	"golang.org/x/crypto/sha3"
+)
+
 func (s *HandlerSession) isLoggedIn() bool {
 	if s.user.crypt == nil {
 		return false
@@ -19,17 +27,32 @@ const (
 func (s *HandlerSession) Authenticate(email, pw string) bool {
 
 	u, err := s.store.ReadUserByEmail(email)
-
 	if err != nil {
 		return false
 	}
 
-	//todo hash
-	if pw == u.pw {
+	pwHash, err := HashPassword(pw)
+	if err != nil {
+		return false
+	}
+
+	if bytes.Equal(pwHash, u.pw) {
 		s.user.crypt = NewCrypt(TEST_TOKEN)
 		s.user.userName = u.name
 		return true
 	}
 
 	return false
+}
+
+func HashPassword(pw string) ([]byte, error) {
+	sh := sha3.New256()
+	_, errSh := sh.Write([]byte(pw))
+
+	if errSh != nil {
+		return nil, errors.New("could not hash password")
+	}
+
+	return sh.Sum(nil), nil
+
 }

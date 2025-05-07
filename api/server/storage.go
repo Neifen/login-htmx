@@ -43,10 +43,12 @@ func (*TestStore) DeleteUser(u *UserType) error {
 }
 
 func (s *TestStore) ReadUserByEmail(email string) (*UserType, error) {
+	pwHash, _ := HashPassword(s.pw)
+
 	return &UserType{
 		id:    s.id,
 		email: s.email,
-		pw:    s.pw,
+		pw:    pwHash,
 		name:  s.name,
 	}, nil
 }
@@ -100,7 +102,7 @@ func NewPostGresStore() (*PostgresStore, error) {
 	id SERIAL PRIMARY KEY,
 	name varchar not null,
 	email citext not null unique,
-	pw varchar not null,
+	pw bytea not null,
 	created_at timestamptz not null default now()
 	)
 	`)
@@ -146,7 +148,7 @@ func (pg *PostgresStore) ReadUserByEmail(req string) (*UserType, error) {
 
 	var id int
 	var email string
-	var pw string
+	var pw []byte
 	var name string
 	err := row.Scan(&id, &email, &pw, &name)
 	if err != nil {
