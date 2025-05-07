@@ -1,8 +1,6 @@
 package server
 
 import (
-	"fmt"
-
 	"github.com/labstack/echo/v4"
 	"github.com/neifen/htmx-login/view"
 )
@@ -95,8 +93,6 @@ func (s *HandlerSession) handlePostSignup(c echo.Context) error {
 		return s.redirectToHome(c)
 	}
 
-	values, _ := c.FormParams()
-	fmt.Printf("formvalues: %+v\n", values)
 	email := c.FormValue("email")
 	pw := c.FormValue("password")
 	name := c.FormValue("name")
@@ -107,6 +103,8 @@ func (s *HandlerSession) handlePostSignup(c echo.Context) error {
 	if err != nil {
 		return s.handleGetSignup(c)
 	}
+
+	//todo success
 	return s.redirectToLogin(c)
 }
 

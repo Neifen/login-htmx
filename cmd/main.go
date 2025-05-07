@@ -7,7 +7,7 @@ import (
 )
 
 func main() {
-	store, err := server.NewTestStore()
+	store, err := server.NewPostGresStore()
 	if err != nil {
 		log.Fatal(err)
 	}

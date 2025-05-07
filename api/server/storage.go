@@ -4,7 +4,10 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log"
+	"os"
 
+	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 )
 
@@ -52,9 +55,24 @@ type PostgresStore struct {
 	db *sql.DB
 }
 
+func loadConfig() {
+	err := godotenv.Load(".env")
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
+}
+
 func NewPostGresStore() (*PostgresStore, error) {
+	loadConfig()
+
+	host := os.Getenv("POSTGRES_HOST")
+	port := os.Getenv("POSTGRES_PORT")
+	dbname := os.Getenv("POSTGRES_DB")
+	user := os.Getenv("POSTGRES_USER")
+	password := os.Getenv("POSTGRES_PW")
+
 	// connStr := "user=pqgotest dbname=pqgotest sslmode=verify-full"
-	connStr := "user=postgres password=? dbname=postgres sslmode=disable"
+	connStr := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable", host, port, user, password, dbname)
 	db, err := sql.Open("postgres", connStr)
 	if err != nil {
 		return nil, errors.New("error 130: could not initialize db")
@@ -73,7 +91,7 @@ func NewPostGresStore() (*PostgresStore, error) {
 	CREATE TABLE 
 	IF NOT EXISTS 
 	users(
-	id int8 primary key,
+	id SERIAL PRIMARY KEY,
 	name varchar not null,
 	email citext not null unique,
 	pw varchar not null,
@@ -81,6 +99,7 @@ func NewPostGresStore() (*PostgresStore, error) {
 	)
 	`)
 	if err != nil {
+		fmt.Println(err)
 		return nil, errors.New("error 133: could not initialize db")
 	}
 
@@ -96,10 +115,11 @@ func (pg *PostgresStore) CreateUser(u *UserType) error {
 	fmt.Printf("Creating User %+v\n", u)
 
 	var userid int //dont really need it
-	row := pg.db.QueryRow("INSERT INTO USER (name, email, pw) VALUES ($1, $2, $3)", u.name, u.email, u.pw)
+	row := pg.db.QueryRow("INSERT INTO users(name, email, pw) VALUES ($1, $2, $3) RETURNING id", u.name, u.email, u.pw)
 	err := row.Scan(&userid)
 
 	if err != nil {
+		fmt.Println(err)
 		return errors.New("db error 430: could not add user")
 	}
 	return nil
@@ -116,7 +136,7 @@ func (*PostgresStore) DeleteUser(u *UserType) error {
 }
 
 func (pg *PostgresStore) ReadUserByEmail(req string) (*UserType, error) {
-	row := pg.db.QueryRow("SELECT id, email, pw, name from user where email=$1", req)
+	row := pg.db.QueryRow("SELECT id, email, pw, name from users where email=$1", req)
 
 	var id int
 	var email string
@@ -124,6 +144,7 @@ func (pg *PostgresStore) ReadUserByEmail(req string) (*UserType, error) {
 	var name string
 	err := row.Scan(&id, &email, &pw, &name)
 	if err != nil {
+		fmt.Println(err)
 		return nil, errors.New("db error 431: could not read user")
 	}
 
