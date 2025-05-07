@@ -57,6 +57,11 @@ type PostgresStore struct {
 
 func loadConfig() {
 	err := godotenv.Load(".env")
+	if err == nil {
+		return
+	}
+
+	err = godotenv.Load("run/secrets/.env")
 	if err != nil {
 		log.Fatal("Error loading .env file")
 	}

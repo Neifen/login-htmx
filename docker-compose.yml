@@ -6,7 +6,9 @@ services:
       dockerfile: ./docker/Dockerfile
     #todo use secret
     secrets:
-      - db-password
+      - dot-env
+    # environment:
+    #   - DOT_ENV_FILE=/run/secrets/.env
     # ports:
     #   - 80:1323
     hostname: backend-url
@@ -59,3 +61,5 @@ volumes:
 secrets:
   db-password:
     file: docker/db/password.txt
+  dot-env:
+    file: .env
