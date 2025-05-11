@@ -38,10 +38,11 @@ func (api *APIServer) Run() {
 
 	e.GET(SIGNUP_PATH, s.handleGetSignup)
 	e.POST(SIGNUP_PATH, s.handlePostSignup)
-	
+
 	e.POST(LOGOUT_PATH, s.handlePostLogout)
 	e.GET(RECOVERY_PATH, s.handleGetRecovery)
 
+	e.Use()
 	// home
 	e.GET(HOME_PATH, s.handleGetHome)
 	e.GET(HOME_SECONDARY_PATH, s.handleGetHome)

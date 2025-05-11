@@ -6,7 +6,8 @@ import (
 )
 
 func (s *HandlerSession) handleGetHome(c echo.Context) error {
-	if !s.isLoggedIn() {
+	// fmt.Println(c.Cookies())
+	if !s.isLoggedIn(c.Cookie("token")) {
 		return s.redirectToLogin(c)
 	}
 

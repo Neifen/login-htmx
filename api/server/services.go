@@ -4,16 +4,26 @@ import (
 	// "crypto"
 	"bytes"
 	"errors"
+	"net/http"
 
 	"golang.org/x/crypto/sha3"
 )
 
-func (s *HandlerSession) isLoggedIn() bool {
-	if s.user.crypt == nil {
+func (s *HandlerSession) isLoggedIn(cookie *http.Cookie, err error) bool {
+	if err != nil {
 		return false
 	}
 
-	return s.user.crypt.token == TEST_TOKEN
+	if cookie == nil {
+		return false
+	}
+
+	token := cookie.Value
+	if err := CheckToken(token); err != nil {
+		return false
+	}
+
+	return true
 }
 
 const (
@@ -37,8 +47,8 @@ func (s *HandlerSession) Authenticate(email, pw string) bool {
 	}
 
 	if bytes.Equal(pwHash, u.pw) {
-		s.user.crypt = NewCrypt(TEST_TOKEN)
-		s.user.userName = u.name
+		s.user = u.ToUserInfo()
+		s.user.AddCrypt()
 		return true
 	}
 

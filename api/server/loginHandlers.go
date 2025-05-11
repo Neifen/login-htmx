@@ -1,7 +1,11 @@
 package server
 
 import (
+	"net/http"
+	"time"
+
 	"github.com/labstack/echo/v4"
+	"github.com/neifen/htmx-login/api/logging"
 	"github.com/neifen/htmx-login/view"
 )
 
@@ -19,11 +23,8 @@ func NewHanderSession(store Storage) *HandlerSession {
 
 type UserInfo struct {
 	userName string
+	uid      string
 	crypt    *Crypt
-}
-
-func NewUserInfo(userName string) *UserInfo {
-	return &UserInfo{userName: userName}
 }
 
 func EmptyUserInfo() *UserInfo {
@@ -35,12 +36,20 @@ type Crypt struct {
 	refreshToken string
 }
 
-func NewCrypt(token string) *Crypt {
-	return &Crypt{token: token, refreshToken: "453153"}
+func (ui *UserInfo) AddCrypt() {
+	token, _, err := NewToken(ui)
+	if err != nil {
+		logging.Error(err)
+		return
+	}
+
+	refresh := NewRefreshToken(ui)
+
+	ui.crypt = &Crypt{token: token, refreshToken: refresh}
 }
 
 func (s *HandlerSession) handleGetLogin(c echo.Context) error {
-	if s.isLoggedIn() {
+	if s.isLoggedIn(c.Cookie("token")) {
 		return s.redirectToHome(c)
 	}
 
@@ -49,7 +58,7 @@ func (s *HandlerSession) handleGetLogin(c echo.Context) error {
 }
 
 func (s *HandlerSession) handlePostLogin(c echo.Context) error {
-	if s.isLoggedIn() {
+	if s.isLoggedIn(c.Cookie("token")) {
 		return s.redirectToHome(c)
 	}
 
@@ -57,6 +66,13 @@ func (s *HandlerSession) handlePostLogin(c echo.Context) error {
 	pw := c.FormValue("password")
 
 	if s.Authenticate(email, pw) {
+		//add cookie
+		cookie := new(http.Cookie)
+		cookie.Name = "token"
+		cookie.Value = s.user.crypt.token
+		cookie.Expires = time.Now().Add(15 * time.Minute)
+		c.SetCookie(cookie)
+
 		return s.redirectToHome(c)
 	}
 
@@ -71,7 +87,7 @@ func (s *HandlerSession) handlePostLogout(c echo.Context) error {
 }
 
 func (s *HandlerSession) handleGetRecovery(c echo.Context) error {
-	if s.isLoggedIn() {
+	if s.isLoggedIn(c.Cookie("token")) {
 		return s.redirectToHome(c)
 	}
 
@@ -80,7 +96,7 @@ func (s *HandlerSession) handleGetRecovery(c echo.Context) error {
 }
 
 func (s *HandlerSession) handleGetSignup(c echo.Context) error {
-	if s.isLoggedIn() {
+	if s.isLoggedIn(c.Cookie("token")) {
 		return s.redirectToHome(c)
 	}
 
@@ -89,7 +105,7 @@ func (s *HandlerSession) handleGetSignup(c echo.Context) error {
 }
 
 func (s *HandlerSession) handlePostSignup(c echo.Context) error {
-	if s.isLoggedIn() {
+	if s.isLoggedIn(c.Cookie("token")) {
 		return s.redirectToHome(c)
 	}
 
@@ -101,6 +117,8 @@ func (s *HandlerSession) handlePostSignup(c echo.Context) error {
 	err := s.store.CreateUser(u)
 
 	if err != nil {
+		logging.Error(err)
+		// todo show error
 		return s.handleGetSignup(c)
 	}
 

@@ -1,9 +1,14 @@
 package server
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/google/uuid"
+)
 
 type UserType struct {
 	id    int
+	uid   string
 	name  string
 	email string
 	pw    []byte
@@ -21,5 +26,10 @@ func NewUserType(name, email, pw string) *UserType {
 		name:  name,
 		email: email,
 		pw:    pwHash,
+		uid:   uuid.NewString(),
 	}
+}
+
+func (u *UserType) ToUserInfo() *UserInfo {
+	return &UserInfo{userName: u.name, uid: u.uid, crypt: nil}
 }

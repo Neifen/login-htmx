@@ -4,10 +4,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"log"
 	"os"
 
-	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 )
 
@@ -18,68 +16,18 @@ type Storage interface {
 	UpdateUser(u *UserType) error
 }
 
-type TestStore struct {
-	email string
-	id    int
-	pw    string
-	name  string
-}
-
-func NewTestStore() (*TestStore, error) {
-	return &TestStore{email: "nate@test.ch", id: 123, pw: "pw", name: "Nate"}, nil
-}
-
-func (*TestStore) CreateUser(u *UserType) error {
-	fmt.Printf("Creating User %+v\n", u)
-	return nil
-}
-
-func (*TestStore) UpdateUser(u *UserType) error {
-	return nil
-}
-
-func (*TestStore) DeleteUser(u *UserType) error {
-	return nil
-}
-
-func (s *TestStore) ReadUserByEmail(email string) (*UserType, error) {
-	pwHash, _ := HashPassword(s.pw)
-
-	return &UserType{
-		id:    s.id,
-		email: s.email,
-		pw:    pwHash,
-		name:  s.name,
-	}, nil
-}
-
 type PostgresStore struct {
 	db *sql.DB
 }
 
-func loadConfig() {
-	err := godotenv.Load(".env")
-	if err == nil {
-		return
-	}
-	fmt.Println(err)
-
-	err = godotenv.Load("/run/secrets/dot-env")
-	if err != nil {
-		log.Fatal("Error loading secret .env file")
-	}
-}
-
 func NewPostGresStore() (*PostgresStore, error) {
-	loadConfig()
-
 	host := os.Getenv("POSTGRES_HOST")
 	port := os.Getenv("POSTGRES_PORT")
 	dbname := os.Getenv("POSTGRES_DB")
 	user := os.Getenv("POSTGRES_USER")
 	password := os.Getenv("POSTGRES_PW")
 
-	// connStr := "user=pqgotest dbname=pqgotest sslmode=verify-full"
+	// connStr := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=verify-full", host, port, user, password, dbname)
 	connStr := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable", host, port, user, password, dbname)
 	db, err := sql.Open("postgres", connStr)
 	if err != nil {
@@ -103,7 +51,9 @@ func NewPostGresStore() (*PostgresStore, error) {
 	name varchar not null,
 	email citext not null unique,
 	pw bytea not null,
-	created_at timestamptz not null default now()
+	uid varchar not null,
+	created_at timestamptz not null default now(),
+	updated_at timestamptz not null default now()
 	)
 	`)
 	if err != nil {
@@ -120,14 +70,15 @@ func NewPostGresStore() (*PostgresStore, error) {
 }
 
 func (pg *PostgresStore) CreateUser(u *UserType) error {
-	fmt.Printf("Creating User %+v\n", u)
-
 	var userid int //dont really need it
-	row := pg.db.QueryRow("INSERT INTO users(name, email, pw) VALUES ($1, $2, $3) RETURNING id", u.name, u.email, u.pw)
+	row := pg.db.QueryRow("INSERT INTO users(name, email, pw, uid) VALUES ($1, $2, $3, $4) RETURNING id", u.name, u.email, u.pw, u.uid)
 	err := row.Scan(&userid)
 
 	if err != nil {
-		fmt.Println(err)
+
+		if err.Error() == `pq: duplicate key value violates unique constraint "users_email_key"` {
+			return fmt.Errorf("user %s already exists", u.email)
+		}
 		return errors.New("db error 430: could not add user")
 	}
 	return nil
@@ -144,16 +95,17 @@ func (*PostgresStore) DeleteUser(u *UserType) error {
 }
 
 func (pg *PostgresStore) ReadUserByEmail(req string) (*UserType, error) {
-	row := pg.db.QueryRow("SELECT id, email, pw, name from users where email=$1", req)
+	row := pg.db.QueryRow("SELECT id, email, pw, name, uid from users where email=$1", req)
 
 	var id int
 	var email string
 	var pw []byte
 	var name string
-	err := row.Scan(&id, &email, &pw, &name)
+	var uid string
+
+	err := row.Scan(&id, &email, &pw, &name, &uid)
 	if err != nil {
-		fmt.Println(err)
-		return nil, errors.New("db error 431: could not read user")
+		return nil, fmt.Errorf("db error 431: could not read user %s", req)
 	}
 
 	return &UserType{
@@ -161,5 +113,6 @@ func (pg *PostgresStore) ReadUserByEmail(req string) (*UserType, error) {
 		email: email,
 		pw:    pw,
 		name:  name,
+		uid:   uid,
 	}, nil
 }
