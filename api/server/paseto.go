@@ -8,7 +8,7 @@ import (
 	"aidanwoods.dev/go-paseto"
 )
 
-func NewToken(u *UserInfo) (string, *time.Time, error) {
+func NewToken(uid, name string) (string, *time.Time, error) {
 	// Access token are signed (asymetric / public enrypt)
 	token := paseto.NewToken()
 
@@ -17,7 +17,8 @@ func NewToken(u *UserInfo) (string, *time.Time, error) {
 	exp := time.Now().Add(2 * time.Hour)
 	token.SetExpiration(exp)
 
-	token.SetString("user-id", u.userName)
+	token.SetString("user-id", uid)
+	token.SetString("user-name", name)
 
 	priv := os.Getenv("TOKEN_PRIV_KEY")
 
@@ -31,23 +32,23 @@ func NewToken(u *UserInfo) (string, *time.Time, error) {
 	return signed, &exp, nil
 }
 
-func CheckToken(signed string) error {
+func CheckToken(signed string) (*paseto.Token, error) {
 	pub := os.Getenv("TOKEN_PUB_KEY")
 	public, err := paseto.NewV4AsymmetricPublicKeyFromHex(pub)
 	if err != nil {
-		return fmt.Errorf("could not create public key")
+		return nil, fmt.Errorf("could not create public key")
 	}
 
 	parser := paseto.NewParser()
 	token, err := parser.ParseV4Public(public, signed, nil)
-	fmt.Println(token)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return nil
+
+	return token, nil
 }
 
-func NewRefreshToken(u *UserInfo) string {
+func NewRefreshToken(uid string) (string, *time.Time) {
 	// Access token are encrypted (symetric / private enrypt)
 
 	//todo do this
@@ -55,12 +56,14 @@ func NewRefreshToken(u *UserInfo) string {
 
 	token.SetIssuedAt(time.Now())
 	token.SetNotBefore(time.Now())
-	token.SetExpiration(time.Now().Add(2 * time.Hour))
 
-	token.SetString("user-id", u.userName)
+	exp := time.Now().Add(24 * time.Hour)
+	token.SetExpiration(exp)
+
+	token.SetString("user-id", uid)
 
 	secretKey := paseto.NewV4SymmetricKey() // do not share
 	encrypted := token.V4Encrypt(secretKey, nil)
 
-	return encrypted
+	return encrypted, &exp
 }

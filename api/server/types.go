@@ -30,6 +30,19 @@ func NewUserType(name, email, pw string) *UserType {
 	}
 }
 
-func (u *UserType) ToUserInfo() *UserInfo {
-	return &UserInfo{userName: u.name, uid: u.uid, crypt: nil}
+func (u *UserType) ToUserReq() *userReq {
+	token, exp, err := NewToken(u.uid, u.name)
+	refresh, refreshExp := NewRefreshToken(u.uid)
+	if err != nil {
+		return emptyUser()
+	}
+
+	return &userReq{
+		name:       u.name,
+		uuid:       u.uid,
+		isLoggedIn: true,
+		token:      token, expires: exp,
+		refresh:        refresh,
+		refreshExpires: refreshExp,
+	}
 }

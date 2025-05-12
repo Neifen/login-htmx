@@ -2,7 +2,6 @@ package server
 
 import (
 	"net/http"
-	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/neifen/htmx-login/api/logging"
@@ -11,46 +10,17 @@ import (
 
 type HandlerSession struct {
 	store Storage //interfaces are already pointers?
-	user  *UserInfo
 }
 
 func NewHanderSession(store Storage) *HandlerSession {
 	return &HandlerSession{
 		store: store,
-		user:  EmptyUserInfo(),
 	}
-}
-
-type UserInfo struct {
-	userName string
-	uid      string
-	crypt    *Crypt
-}
-
-func EmptyUserInfo() *UserInfo {
-	return &UserInfo{}
-}
-
-type Crypt struct {
-	token        string
-	refreshToken string
-}
-
-func (ui *UserInfo) AddCrypt() {
-	token, _, err := NewToken(ui)
-	if err != nil {
-		logging.Error(err)
-		return
-	}
-
-	refresh := NewRefreshToken(ui)
-
-	ui.crypt = &Crypt{token: token, refreshToken: refresh}
 }
 
 func (s *HandlerSession) handleGetLogin(c echo.Context) error {
-	if s.isLoggedIn(c.Cookie("token")) {
-		return s.redirectToHome(c)
+	if u := userFromToken(c); u.isLoggedIn {
+		return s.redirectToHome(c, u)
 	}
 
 	child := view.Login()
@@ -58,22 +28,48 @@ func (s *HandlerSession) handleGetLogin(c echo.Context) error {
 }
 
 func (s *HandlerSession) handlePostLogin(c echo.Context) error {
-	if s.isLoggedIn(c.Cookie("token")) {
-		return s.redirectToHome(c)
+	if u := userFromToken(c); u.isLoggedIn {
+		return s.redirectToHome(c, u)
 	}
 
 	email := c.FormValue("email")
 	pw := c.FormValue("password")
 
-	if s.Authenticate(email, pw) {
-		//add cookie
-		cookie := new(http.Cookie)
-		cookie.Name = "token"
-		cookie.Value = s.user.crypt.token
-		cookie.Expires = time.Now().Add(15 * time.Minute)
-		c.SetCookie(cookie)
+	userReq := s.Authenticate(email, pw)
 
-		return s.redirectToHome(c)
+	/*
+		Set-Cookie: access_token=eyJ…; HttpOnly; Secure
+		Set-Cookie: refresh_token=…; Max-Age=31536000; Path=/api/auth/refresh; HttpOnly; Secure
+
+	*/
+	if userReq.isLoggedIn {
+		//add cookie
+		token := new(http.Cookie)
+		token.Name = "token"
+		token.Value = userReq.token
+		token.Expires = *userReq.expires
+		token.HttpOnly = true
+		token.Secure = true
+		c.SetCookie(token)
+		tokenExp := new(http.Cookie)
+		tokenExp.Name = "token-expires"
+		tokenExp.Value = userReq.expires.String()
+		c.SetCookie(tokenExp)
+
+		refresh := new(http.Cookie)
+		refresh.Name = "refresh"
+		refresh.Path = "token/refresh"
+		refresh.Value = userReq.refresh
+		refresh.Expires = *userReq.refreshExpires
+		refresh.HttpOnly = true
+		refresh.Secure = true
+		c.SetCookie(refresh)
+		refreshExp := new(http.Cookie)
+		refreshExp.Name = "refresh-expires"
+		refreshExp.Value = userReq.refreshExpires.String()
+		c.SetCookie(refreshExp)
+
+		return s.redirectToHome(c, userReq)
 	}
 
 	// authenticate failed
@@ -81,14 +77,18 @@ func (s *HandlerSession) handlePostLogin(c echo.Context) error {
 }
 
 func (s *HandlerSession) handlePostLogout(c echo.Context) error {
-	s.user = EmptyUserInfo()
+	cookie := new(http.Cookie)
+	cookie.Name = "token"
+	cookie.Value = "delete"
+	cookie.MaxAge = -1
 
+	c.SetCookie(cookie)
 	return s.redirectToLogin(c)
 }
 
 func (s *HandlerSession) handleGetRecovery(c echo.Context) error {
-	if s.isLoggedIn(c.Cookie("token")) {
-		return s.redirectToHome(c)
+	if u := userFromToken(c); u.isLoggedIn {
+		return s.redirectToHome(c, u)
 	}
 
 	child := view.PWRecovery()
@@ -96,8 +96,8 @@ func (s *HandlerSession) handleGetRecovery(c echo.Context) error {
 }
 
 func (s *HandlerSession) handleGetSignup(c echo.Context) error {
-	if s.isLoggedIn(c.Cookie("token")) {
-		return s.redirectToHome(c)
+	if u := userFromToken(c); u.isLoggedIn {
+		return s.redirectToHome(c, u)
 	}
 
 	child := view.Signup()
@@ -105,8 +105,8 @@ func (s *HandlerSession) handleGetSignup(c echo.Context) error {
 }
 
 func (s *HandlerSession) handlePostSignup(c echo.Context) error {
-	if s.isLoggedIn(c.Cookie("token")) {
-		return s.redirectToHome(c)
+	if u := userFromToken(c); u.isLoggedIn {
+		return s.redirectToHome(c, u)
 	}
 
 	email := c.FormValue("email")
