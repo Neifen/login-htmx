@@ -48,22 +48,42 @@ func CheckToken(signed string) (*paseto.Token, error) {
 	return token, nil
 }
 
-func NewRefreshToken(uid string) (string, *time.Time) {
+func NewRefreshToken(uid string) (string, *time.Time, error) {
 	// Access token are encrypted (symetric / private enrypt)
 
-	//todo do this
 	token := paseto.NewToken()
 
 	token.SetIssuedAt(time.Now())
 	token.SetNotBefore(time.Now())
 
-	exp := time.Now().Add(24 * time.Hour)
+	exp := time.Now().Add(7 * 24 * time.Hour)
 	token.SetExpiration(exp)
 
 	token.SetString("user-id", uid)
 
-	secretKey := paseto.NewV4SymmetricKey() // do not share
+	priv := os.Getenv("TOKEN_LOCAL_KEY")
+	secretKey, err := paseto.V4SymmetricKeyFromHex(priv)
+	if err != nil {
+		return "", nil, err
+	}
+
 	encrypted := token.V4Encrypt(secretKey, nil)
 
-	return encrypted, &exp
+	return encrypted, &exp, nil
+}
+
+func CheckRefreshToken(encrypted string) (*paseto.Token, error) {
+	priv := os.Getenv("TOKEN_LOCAL_KEY")
+	secretKey, err := paseto.V4SymmetricKeyFromHex(priv)
+	if err != nil {
+		return nil, err
+	}
+
+	parser := paseto.NewParser()
+	token, err := parser.ParseV4Local(secretKey, encrypted, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return token, nil
 }

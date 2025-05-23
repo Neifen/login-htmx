@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"time"
 
 	_ "github.com/lib/pq"
 )
@@ -13,7 +14,12 @@ type Storage interface {
 	CreateUser(u *UserType) error
 	DeleteUser(u *UserType) error
 	ReadUserByEmail(email string) (*UserType, error)
+	ReadUserByUid(uid string) (*UserType, error)
 	UpdateUser(u *UserType) error
+
+	CreateRefreshToken(t *RefreshTokenType) error
+	DeleteRefreshToken(t *RefreshTokenType) error
+	ReadRefreshTokenByToken(token string) (*RefreshTokenType, error)
 }
 
 type PostgresStore struct {
@@ -58,7 +64,24 @@ func NewPostGresStore() (*PostgresStore, error) {
 	`)
 	if err != nil {
 		fmt.Println(err)
-		return nil, errors.New("error 133: could not initialize db")
+		return nil, errors.New("error 133a: could not initialize db")
+	}
+
+	_, err = db.Query(`
+	CREATE TABLE 
+	IF NOT EXISTS 
+	refresh_token(
+	id SERIAL PRIMARY KEY,
+	user_uid varchar not null,
+	token varchar not null,
+	expires timestamptz not null,
+	created_at timestamptz not null default now(),
+	updated_at timestamptz not null default now()
+	)
+	`)
+	if err != nil {
+		fmt.Println(err)
+		return nil, errors.New("error 133b: could not initialize db")
 	}
 
 	_, err = db.Query("CREATE UNIQUE INDEX IF NOT EXISTS users_unique_lower_email_idx ON users (lower(email));")
@@ -114,5 +137,68 @@ func (pg *PostgresStore) ReadUserByEmail(req string) (*UserType, error) {
 		pw:    pw,
 		name:  name,
 		uid:   uid,
+	}, nil
+}
+
+func (pg *PostgresStore) ReadUserByUid(uid string) (*UserType, error) {
+	row := pg.db.QueryRow("SELECT id, email, pw, name, uid from users where uid=$1", uid)
+
+	var id int
+	var email string
+	var pw []byte
+	var name string
+	var uidRes string
+
+	err := row.Scan(&id, &email, &pw, &name, &uidRes)
+	if err != nil {
+		return nil, fmt.Errorf("db error 441: could not read user %s", uid)
+	}
+
+	return &UserType{
+		id:    id,
+		email: email,
+		pw:    pw,
+		name:  name,
+		uid:   uidRes,
+	}, nil
+}
+
+func (pg *PostgresStore) CreateRefreshToken(t *RefreshTokenType) error {
+	var id int //dont really need it
+	row := pg.db.QueryRow("INSERT INTO refresh_tokens(user_uid, token, expiration) VALUES ($1, $2, $3) RETURNING id", t.userUid, t.token, t.expiration)
+	err := row.Scan(&id)
+
+	if err != nil {
+		return errors.New("db error 610: could not add new refresh_token")
+	}
+	return nil
+}
+
+func (pg *PostgresStore) DeleteRefreshToken(t *RefreshTokenType) error {
+	_, err := pg.db.Query("DELETE FROM refresh_token rt where rt.id = $1", t.id)
+	if err != nil {
+		return fmt.Errorf("db error 620: could not delete refresh_token %v", t.id)
+	}
+	return nil
+}
+
+func (pg *PostgresStore) ReadRefreshTokenByToken(token string) (*RefreshTokenType, error) {
+	row := pg.db.QueryRow("SELECT id, user_uid, token, expiration from refresh_token where token = $1", token)
+
+	var id int
+	var tokenRes string
+	var userUid string
+	var expiration time.Time
+
+	err := row.Scan(&id, &tokenRes, &userUid, &expiration)
+	if err != nil {
+		return nil, fmt.Errorf("db error 630: could not read refresh_token %s", token)
+	}
+
+	return &RefreshTokenType{
+		id:         id,
+		token:      tokenRes,
+		userUid:    userUid,
+		expiration: expiration,
 	}, nil
 }

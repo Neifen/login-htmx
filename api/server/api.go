@@ -11,8 +11,12 @@ const (
 	LOGOUT_PATH   string = "/logout"
 	RECOVERY_PATH string = "/recovery"
 
+	REFRESH_PATH string = "/token/refresh"
+
+
 	HOME_PATH           string = "/"
 	HOME_SECONDARY_PATH string = "/home"
+
 )
 
 type APIServer struct {
@@ -42,6 +46,8 @@ func (api *APIServer) Run() {
 	e.POST(LOGOUT_PATH, s.handlePostLogout)
 	e.GET(RECOVERY_PATH, s.handleGetRecovery)
 
+	e.POST(REFRESH_PATH, s.handlePostTokenRefresh)
+	
 	e.Use()
 	// home
 	e.GET(HOME_PATH, s.handleGetHome)

@@ -1,8 +1,6 @@
 package server
 
 import (
-	"time"
-
 	"github.com/labstack/echo/v4"
 )
 
@@ -10,10 +8,6 @@ type userReq struct {
 	isLoggedIn     bool
 	name           string
 	uuid           string
-	token          string
-	expires        *time.Time
-	refresh        string
-	refreshExpires *time.Time
 }
 
 func emptyUser() *userReq {
@@ -38,5 +32,5 @@ func userFromToken(c echo.Context) *userReq {
 
 	name, _ := token.GetString("user-name")
 
-	return &userReq{isLoggedIn: true, name: name, uuid: uid, token: cookie.Value}
+	return &userReq{isLoggedIn: true, name: name, uuid: uid}
 }

@@ -1,7 +1,9 @@
 package server
 
 import (
+	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/neifen/htmx-login/api/logging"
@@ -36,44 +38,101 @@ func (s *HandlerSession) handlePostLogin(c echo.Context) error {
 	pw := c.FormValue("password")
 
 	userReq := s.Authenticate(email, pw)
+	if userReq.isLoggedIn {
+		err := createAndHandleTokens(userReq, c)
 
+		if err == nil {
+			return s.redirectToHome(c, userReq)
+		} else {
+			fmt.Printf("\n\n auth: %v \n\n", err)
+
+		}
+
+	}
+
+	// authenticate failed
+	return s.redirectToLogin(c)
+}
+
+func (s *HandlerSession) handlePostTokenRefresh(c echo.Context) error {
+	cookie, err := c.Cookie("refresh")
+	if err != nil || cookie == nil {
+		return c.String(http.StatusUnauthorized, "No refresh token")
+	}
+
+	token, err := CheckRefreshToken(cookie.Value)
+	if err != nil {
+		return c.String(http.StatusUnauthorized, "Refresh token invalid")
+	}
+
+	exp, err := token.GetExpiration()
+	if err != nil || exp.Before(time.Now()) {
+		return c.String(http.StatusUnauthorized, "Refresh token invalid")
+	}
+
+	//todo get token from db and check against this one
+	refreshType, err := s.store.ReadRefreshTokenByToken(cookie.Value)
+	if err != nil {
+		return c.String(http.StatusUnauthorized, "Refresh token invalid")
+	}
+
+	user, err := s.store.ReadUserByUid(refreshType.userUid)
+	if err != nil {
+		return c.String(http.StatusUnauthorized, "Refresh token invalid")
+	}
+
+	err = createAndHandleTokens(user.ToUserReq(), c)
+	if err != nil {
+		return c.String(http.StatusUnauthorized, "Refresh token invalid")
+	}
+
+	return c.String(http.StatusOK, "Token successfully refreshed")
+}
+
+func createAndHandleTokens(user *userReq, c echo.Context) error {
+	token, tokenExp, err := NewToken(user.uuid, user.name)
+	if err != nil {
+		return err
+	}
+
+	refresh, refreshExp, err := NewRefreshToken(user.uuid)
+	if err != nil {
+		return err
+	}
 	/*
 		Set-Cookie: access_token=eyJ…; HttpOnly; Secure
 		Set-Cookie: refresh_token=…; Max-Age=31536000; Path=/api/auth/refresh; HttpOnly; Secure
 
 	*/
-	if userReq.isLoggedIn {
-		//add cookie
-		token := new(http.Cookie)
-		token.Name = "token"
-		token.Value = userReq.token
-		token.Expires = *userReq.expires
-		token.HttpOnly = true
-		token.Secure = true
-		c.SetCookie(token)
-		tokenExp := new(http.Cookie)
-		tokenExp.Name = "token-expires"
-		tokenExp.Value = userReq.expires.String()
-		c.SetCookie(tokenExp)
+	//add cookie
+	tokenC := new(http.Cookie)
+	tokenC.Name = "token"
+	tokenC.Value = token
+	tokenC.Expires = *tokenExp
+	tokenC.HttpOnly = true
+	tokenC.Secure = true
+	c.SetCookie(tokenC)
 
-		refresh := new(http.Cookie)
-		refresh.Name = "refresh"
-		refresh.Path = "token/refresh"
-		refresh.Value = userReq.refresh
-		refresh.Expires = *userReq.refreshExpires
-		refresh.HttpOnly = true
-		refresh.Secure = true
-		c.SetCookie(refresh)
-		refreshExp := new(http.Cookie)
-		refreshExp.Name = "refresh-expires"
-		refreshExp.Value = userReq.refreshExpires.String()
-		c.SetCookie(refreshExp)
+	tokenExpC := new(http.Cookie)
+	tokenExpC.Name = "token-expires"
+	tokenExpC.Value = tokenExp.String()
+	c.SetCookie(tokenExpC)
 
-		return s.redirectToHome(c, userReq)
-	}
+	refreshC := new(http.Cookie)
+	refreshC.Name = "refresh"
+	refreshC.Path = "token/refresh"
+	refreshC.Value = refresh
+	refreshC.Expires = *refreshExp
+	refreshC.HttpOnly = true
+	refreshC.Secure = true
+	c.SetCookie(refreshC)
 
-	// authenticate failed
-	return s.redirectToLogin(c)
+	refreshExpC := new(http.Cookie)
+	refreshExpC.Name = "refresh-expires"
+	refreshExpC.Value = refreshExp.String()
+	c.SetCookie(refreshExpC)
+
+	return nil
 }
 
 func (s *HandlerSession) handlePostLogout(c echo.Context) error {
