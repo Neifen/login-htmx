@@ -39,7 +39,7 @@ func (s *HandlerSession) handlePostLogin(c echo.Context) error {
 
 	userReq := s.Authenticate(email, pw)
 	if userReq.isLoggedIn {
-		err := createAndHandleTokens(userReq, c)
+		err := s.createAndHandleTokens(userReq, c)
 
 		if err == nil {
 			return s.redirectToHome(c, userReq)
@@ -81,7 +81,7 @@ func (s *HandlerSession) handlePostTokenRefresh(c echo.Context) error {
 		return c.String(http.StatusUnauthorized, "Refresh token invalid")
 	}
 
-	err = createAndHandleTokens(user.ToUserReq(), c)
+	err = s.createAndHandleTokens(user.ToUserReq(), c)
 	if err != nil {
 		return c.String(http.StatusUnauthorized, "Refresh token invalid")
 	}
@@ -89,7 +89,7 @@ func (s *HandlerSession) handlePostTokenRefresh(c echo.Context) error {
 	return c.String(http.StatusOK, "Token successfully refreshed")
 }
 
-func createAndHandleTokens(user *userReq, c echo.Context) error {
+func (s *HandlerSession) createAndHandleTokens(user *userReq, c echo.Context) error {
 	token, tokenExp, err := NewToken(user.uuid, user.name)
 	if err != nil {
 		return err
@@ -99,6 +99,13 @@ func createAndHandleTokens(user *userReq, c echo.Context) error {
 	if err != nil {
 		return err
 	}
+
+	refreshType := NewRefreshTokenType(user.uuid, refresh, *refreshExp)
+	err = s.store.CreateRefreshToken(refreshType)
+	if err != nil {
+		return err
+	}
+
 	/*
 		Set-Cookie: access_token=eyJ…; HttpOnly; Secure
 		Set-Cookie: refresh_token=…; Max-Age=31536000; Path=/api/auth/refresh; HttpOnly; Secure

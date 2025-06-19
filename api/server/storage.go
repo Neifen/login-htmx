@@ -41,7 +41,7 @@ func NewPostGresStore() (*PostgresStore, error) {
 	}
 
 	if err := db.Ping(); err != nil {
-		return nil, errors.New("error 131: could not initialize db")
+		return nil, err
 	}
 
 	_, err = db.Query("CREATE EXTENSION IF NOT EXISTS citext;")
@@ -70,7 +70,7 @@ func NewPostGresStore() (*PostgresStore, error) {
 	_, err = db.Query(`
 	CREATE TABLE 
 	IF NOT EXISTS 
-	refresh_token(
+	refresh_tokens(
 	id SERIAL PRIMARY KEY,
 	user_uid varchar not null,
 	token varchar not null,
@@ -165,11 +165,12 @@ func (pg *PostgresStore) ReadUserByUid(uid string) (*UserType, error) {
 
 func (pg *PostgresStore) CreateRefreshToken(t *RefreshTokenType) error {
 	var id int //dont really need it
-	row := pg.db.QueryRow("INSERT INTO refresh_tokens(user_uid, token, expiration) VALUES ($1, $2, $3) RETURNING id", t.userUid, t.token, t.expiration)
+	row := pg.db.QueryRow("INSERT INTO refresh_tokens(user_uid, token, expires) VALUES ($1, $2, $3) RETURNING id", t.userUid, t.token, t.expiration)
 	err := row.Scan(&id)
 
 	if err != nil {
-		return errors.New("db error 610: could not add new refresh_token")
+		return err
+		// return errors.New("db error 610: could not add new refresh_token")
 	}
 	return nil
 }
@@ -183,7 +184,7 @@ func (pg *PostgresStore) DeleteRefreshToken(t *RefreshTokenType) error {
 }
 
 func (pg *PostgresStore) ReadRefreshTokenByToken(token string) (*RefreshTokenType, error) {
-	row := pg.db.QueryRow("SELECT id, user_uid, token, expiration from refresh_token where token = $1", token)
+	row := pg.db.QueryRow("SELECT id, user_uid, token, expires from refresh_token where token = $1", token)
 
 	var id int
 	var tokenRes string

@@ -1,6 +1,8 @@
 package server
 
 import (
+	"net/http"
+
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 )
@@ -13,10 +15,8 @@ const (
 
 	REFRESH_PATH string = "/token/refresh"
 
-
 	HOME_PATH           string = "/"
 	HOME_SECONDARY_PATH string = "/home"
-
 )
 
 type APIServer struct {
@@ -47,11 +47,19 @@ func (api *APIServer) Run() {
 	e.GET(RECOVERY_PATH, s.handleGetRecovery)
 
 	e.POST(REFRESH_PATH, s.handlePostTokenRefresh)
-	
-	e.Use()
+
+	e.Use(pasetoMiddle())
 	// home
 	e.GET(HOME_PATH, s.handleGetHome)
 	e.GET(HOME_SECONDARY_PATH, s.handleGetHome)
 
 	e.Logger.Fatal(e.Start(api.apiPath))
+}
+
+func pasetoMiddle() echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			return c.String(http.StatusUnauthorized, "Unauthorized")
+		}
+	}
 }
