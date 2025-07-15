@@ -1,5 +1,5 @@
 build:
-	@go build -o bin/htmxlogin
+	@go build -o bin/htmxlogin cmd/main.go
 
 run: build
 	@./bin/htmxlogin

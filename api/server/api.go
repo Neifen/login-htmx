@@ -59,6 +59,10 @@ func (api *APIServer) Run() {
 func pasetoMiddle() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
+			if c.Request().Header.Get("HX-Request") != "true" {
+				// standard redirect
+				return c.Redirect(http.StatusSeeOther, "token/refresh")
+			}
 			return c.String(http.StatusUnauthorized, "Unauthorized")
 		}
 	}
