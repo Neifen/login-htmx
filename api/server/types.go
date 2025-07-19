@@ -47,10 +47,10 @@ func NewRefreshTokenType(userUid, token string, expiration time.Time) *RefreshTo
 	}
 }
 
-func (u *UserType) ToUserReq() *userReq {
-	return &userReq{
-		name:       u.name,
-		uuid:       u.uid,
-		isLoggedIn: true,
-	}
-}
+// func (u *UserModel) ToUserReq() *userReq {
+// 	return &userReq{
+// 		name:       u.name,
+// 		uuid:       u.uid,
+// 		isLoggedIn: true,
+// 	}
+// }

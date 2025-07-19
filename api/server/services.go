@@ -28,8 +28,8 @@ func (s *HandlerSession) Authenticate(email, pw string) *userReq {
 		return emptyUser()
 	}
 
-	if bytes.Equal(pwHash, u.pw) {
-		userReq := u.ToUserReq()
+	if bytes.Equal(pwHash, u.Pw) {
+		userReq := userFromModel(u)
 		return userReq
 	}
 
@@ -45,5 +45,4 @@ func HashPassword(pw string) ([]byte, error) {
 	}
 
 	return sh.Sum(nil), nil
-
 }

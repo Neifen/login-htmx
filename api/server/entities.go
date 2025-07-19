@@ -2,6 +2,7 @@ package server
 
 import (
 	"github.com/labstack/echo/v4"
+	"github.com/neifen/htmx-login/api/storage"
 )
 
 type userReq struct {
@@ -12,6 +13,14 @@ type userReq struct {
 
 func emptyUser() *userReq {
 	return new(userReq)
+}
+
+func userFromModel(u *storage.UserModel) *userReq {
+	return &userReq{
+		name:       u.Name,
+		uuid:       u.Uid,
+		isLoggedIn: true,
+	}
 }
 
 func userFromToken(c echo.Context) *userReq {

@@ -1,10 +1,11 @@
 package server
 
 import (
-	"net/http"
+	"fmt"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	"github.com/neifen/htmx-login/api/storage"
 )
 
 const (
@@ -21,10 +22,10 @@ const (
 
 type APIServer struct {
 	apiPath string
-	store   Storage
+	store   storage.Storage
 }
 
-func NewAPIHandler(path string, s Storage) *APIServer {
+func NewAPIHandler(path string, s storage.Storage) *APIServer {
 	return &APIServer{apiPath: path, store: s}
 }
 
@@ -46,12 +47,13 @@ func (api *APIServer) Run() {
 	e.POST(LOGOUT_PATH, s.handlePostLogout)
 	e.GET(RECOVERY_PATH, s.handleGetRecovery)
 
-	e.POST(REFRESH_PATH, s.handlePostTokenRefresh)
+	// need
+	e.POST(REFRESH_PATH, s.handleTokenRefresh)
+	e.GET(REFRESH_PATH, s.handleTokenRefresh)
 
-	e.Use(pasetoMiddle())
-	// home
-	e.GET(HOME_PATH, s.handleGetHome)
-	e.GET(HOME_SECONDARY_PATH, s.handleGetHome)
+	//e.Use(pasetoMiddle())
+	e.GET(HOME_PATH, s.handleGetHome, pasetoMiddle())
+	e.GET(HOME_SECONDARY_PATH, s.handleGetHome, pasetoMiddle())
 
 	e.Logger.Fatal(e.Start(api.apiPath))
 }
@@ -59,11 +61,16 @@ func (api *APIServer) Run() {
 func pasetoMiddle() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
-			if c.Request().Header.Get("HX-Request") != "true" {
-				// standard redirect
-				return c.Redirect(http.StatusSeeOther, "token/refresh")
+			//todo twice?
+			u := userFromToken(c)
+			//todo there needs to be a difference between simply not logged in / token invalid and refresh token invalid
+			if u.isLoggedIn {
+				c.Set("u", u)
+				fmt.Printf("Middleware, user %s is logged in, continue\n", u.name)
+				return next(c)
 			}
-			return c.String(http.StatusUnauthorized, "Unauthorized")
+
+			return redirectToTokenRefresh(c)
 		}
 	}
 }

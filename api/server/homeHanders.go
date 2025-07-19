@@ -6,8 +6,9 @@ import (
 )
 
 func (s *HandlerSession) handleGetHome(c echo.Context) error {
-	u := userFromToken(c)
-
+	u:= c.Get("u").(*userReq)
+	//u := userFromToken(c)
+	
 	if !u.isLoggedIn {
 		return s.redirectToLogin(c)
 	}

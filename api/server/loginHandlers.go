@@ -7,14 +7,15 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/neifen/htmx-login/api/logging"
+	"github.com/neifen/htmx-login/api/storage"
 	"github.com/neifen/htmx-login/view"
 )
 
 type HandlerSession struct {
-	store Storage //interfaces are already pointers?
+	store storage.Storage //interfaces are already pointers?
 }
 
-func NewHanderSession(store Storage) *HandlerSession {
+func NewHanderSession(store storage.Storage) *HandlerSession {
 	return &HandlerSession{
 		store: store,
 	}
@@ -54,39 +55,66 @@ func (s *HandlerSession) handlePostLogin(c echo.Context) error {
 	return s.redirectToLogin(c)
 }
 
-func (s *HandlerSession) handlePostTokenRefresh(c echo.Context) error {
+func (s *HandlerSession) handleTokenRefresh(c echo.Context) error {
+	err := s.subHandleTokenRefresh(c)
+	if err != nil {
+		s.redirectToLogin(c)
+	}
+
+	return err
+}
+
+func (s *HandlerSession) subHandleTokenRefresh(c echo.Context) error {
 	cookie, err := c.Cookie("refresh")
 	if err != nil || cookie == nil {
-		return c.String(http.StatusUnauthorized, "No refresh token")
+		return c.String(http.StatusUnauthorized, "no refresh token")
 	}
 
 	token, err := CheckRefreshToken(cookie.Value)
 	if err != nil {
-		return c.String(http.StatusUnauthorized, "Refresh token invalid")
+		return c.String(http.StatusUnauthorized, "refresh token invalid")
 	}
 
 	exp, err := token.GetExpiration()
 	if err != nil || exp.Before(time.Now()) {
-		return c.String(http.StatusUnauthorized, "Refresh token invalid")
+		return c.String(http.StatusUnauthorized, "refresh token expired")
 	}
 
 	//todo get token from db and check against this one
 	refreshType, err := s.store.ReadRefreshTokenByToken(cookie.Value)
 	if err != nil {
-		return c.String(http.StatusUnauthorized, "Refresh token invalid")
+		return c.String(http.StatusUnauthorized, "could not load refresh token from db:"+err.Error())
 	}
 
-	user, err := s.store.ReadUserByUid(refreshType.userUid)
+	fmt.Printf("Refresh Token for uid %s loaded\n", refreshType.UserUid)
+	user, err := s.store.ReadUserByUid(refreshType.UserUid)
 	if err != nil {
-		return c.String(http.StatusUnauthorized, "Refresh token invalid")
+		return c.String(http.StatusUnauthorized, "user invalid")
 	}
 
-	err = s.createAndHandleTokens(user.ToUserReq(), c)
+	err = s.createAndHandleTokens(userFromModel(user), c)
 	if err != nil {
-		return c.String(http.StatusUnauthorized, "Refresh token invalid")
+		return c.String(http.StatusUnauthorized, "creating new tokens failed")
 	}
 
+	//this is needed to set token before See Other
+	// c.String(http.StatusOK, "Token successfully refreshed")
+
+	returnUrl := c.QueryParam("return")
+	if returnUrl != "" {
+		return c.Redirect(http.StatusOK, returnUrl)
+	}
+
+	//todo: quicker redirect?
 	return c.String(http.StatusOK, "Token successfully refreshed")
+}
+
+func redirectToTokenRefresh(c echo.Context) error {
+	if c.Request().Header.Get("HX-Request") != "true" {
+		// standard redirect
+		return c.Redirect(http.StatusTemporaryRedirect, ("token/refresh?return=" + c.Request().URL.Path))
+	}
+	return c.String(http.StatusUnauthorized, "Unauthorized")
 }
 
 func (s *HandlerSession) createAndHandleTokens(user *userReq, c echo.Context) error {
@@ -100,7 +128,7 @@ func (s *HandlerSession) createAndHandleTokens(user *userReq, c echo.Context) er
 		return err
 	}
 
-	refreshType := NewRefreshTokenType(user.uuid, refresh, *refreshExp)
+	refreshType := storage.NewRefreshTokenModel(user.uuid, refresh, *refreshExp)
 	err = s.store.CreateRefreshToken(refreshType)
 	if err != nil {
 		return err
@@ -179,7 +207,7 @@ func (s *HandlerSession) handlePostSignup(c echo.Context) error {
 	pw := c.FormValue("password")
 	name := c.FormValue("name")
 
-	u := NewUserType(name, email, pw)
+	u := storage.NewUserModel(name, email, pw)
 	err := s.store.CreateUser(u)
 
 	if err != nil {

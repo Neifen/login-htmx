@@ -6,6 +6,7 @@ import (
 
 	"github.com/joho/godotenv"
 	"github.com/neifen/htmx-login/api/server"
+	"github.com/neifen/htmx-login/api/storage"
 )
 
 func main() {
@@ -15,7 +16,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	store, err := server.NewPostGresStore()
+	store, err := storage.NewPostGresStore()
 	if err != nil {
 		// need to be able to set up db, otherwise fail
 		log.Fatal(err)
