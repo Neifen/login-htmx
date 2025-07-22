@@ -6,11 +6,7 @@ import (
 
 func HashPassword(pw string) ([]byte, error) {
 	sh := sha3.New256()
-	_, errSh := sh.Write([]byte(pw))
-
-	if errSh != nil {
-		return nil, errSh
-	}
+	sh.Write([]byte(pw))
 
 	return sh.Sum(nil), nil
 }

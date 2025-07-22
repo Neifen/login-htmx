@@ -5,7 +5,10 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/pkg/errors"
+
 	"github.com/labstack/echo/v4"
+	"github.com/neifen/htmx-login/api/crypto"
 	"github.com/neifen/htmx-login/api/logging"
 	"github.com/neifen/htmx-login/api/storage"
 	"github.com/neifen/htmx-login/view"
@@ -58,6 +61,7 @@ func (s *HandlerSession) handlePostLogin(c echo.Context) error {
 func (s *HandlerSession) handleTokenRefresh(c echo.Context) error {
 	err := s.subHandleTokenRefresh(c)
 	if err != nil {
+		fmt.Println(err)
 		s.redirectToLogin(c)
 	}
 
@@ -66,46 +70,62 @@ func (s *HandlerSession) handleTokenRefresh(c echo.Context) error {
 
 func (s *HandlerSession) subHandleTokenRefresh(c echo.Context) error {
 	cookie, err := c.Cookie("refresh")
-	if err != nil || cookie == nil {
-		return c.String(http.StatusUnauthorized, "no refresh token")
-	}
-
-	token, err := CheckRefreshToken(cookie.Value)
 	if err != nil {
-		return c.String(http.StatusUnauthorized, "refresh token invalid")
+		return errors.Wrapf(err, "getting refresh token from cookie %q failed", "refresh")
 	}
 
-	exp, err := token.GetExpiration()
-	if err != nil || exp.Before(time.Now()) {
-		return c.String(http.StatusUnauthorized, "refresh token expired")
+	if cookie == nil {
+		return fmt.Errorf("no refresh token in cookie %q", "refresh")
 	}
 
-	//todo get token from db and check against this one
-	refreshType, err := s.store.ReadRefreshTokenByToken(cookie.Value)
+	token, err := crypto.ValidTokenFromCookies(cookie)
 	if err != nil {
-		return c.String(http.StatusUnauthorized, "could not load refresh token from db:"+err.Error())
+		err = s.store.DeleteRefreshTokenByToken(token.Encrypted)
+		if err != nil {
+			fmt.Printf("could not delete refresh token from db %v\n", err)
+		}
+
+		return fmt.Errorf("refresh token could not be validated")
 	}
 
-	fmt.Printf("Refresh Token for uid %s loaded\n", refreshType.UserUid)
+	exp := token.Expiration
+	fmt.Printf("cookie expires: %v, token expires: %v\n", cookie.Expires, token.Expiration)
+
+	if exp.Before(time.Now()) {
+		err = s.store.DeleteRefreshTokenByToken(token.Encrypted)
+		if err != nil {
+			fmt.Printf("could not delete refresh token from db %v\n", err)
+		}
+		return fmt.Errorf("refresh token expired")
+	}
+
+	refreshType, err := s.store.ReadRefreshTokenByToken(token.Encrypted)
+	if err != nil {
+		return errors.Wrapf(err, "could not load refresh token from db")
+	}
+
 	user, err := s.store.ReadUserByUid(refreshType.UserUid)
 	if err != nil {
-		return c.String(http.StatusUnauthorized, "user invalid")
+		return errors.Wrapf(err, "user invalid")
 	}
 
 	err = s.createAndHandleTokens(userFromModel(user), c)
 	if err != nil {
-		return c.String(http.StatusUnauthorized, "creating new tokens failed")
+		return errors.Wrapf(err, "creating new tokens failed")
 	}
 
-	//this is needed to set token before See Other
-	// c.String(http.StatusOK, "Token successfully refreshed")
+	err = s.store.DeleteRefreshToken(refreshType)
+	if err != nil {
+		return errors.Wrapf(err, "could not delete old refresh token")
+	}
 
 	returnUrl := c.QueryParam("return")
 	if returnUrl != "" {
-		return c.Redirect(http.StatusOK, returnUrl)
+		fmt.Printf("redirect with return: %s \n", returnUrl)
+		return c.Redirect(http.StatusSeeOther, returnUrl)
 	}
 
-	//todo: quicker redirect?
+	fmt.Printf("redirect with no return\n")
 	return c.String(http.StatusOK, "Token successfully refreshed")
 }
 
@@ -118,66 +138,56 @@ func redirectToTokenRefresh(c echo.Context) error {
 }
 
 func (s *HandlerSession) createAndHandleTokens(user *userReq, c echo.Context) error {
-	token, tokenExp, err := NewToken(user.uuid, user.name)
+	access, err := crypto.NewAccessToken(user.uuid, user.name)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "could not generate access token")
+	}
+	refresh, err := crypto.NewRefreshToken(user.uuid, user.name, false)
+	if err != nil {
+		return errors.Wrap(err, "could not generate refresh token")
 	}
 
-	refresh, refreshExp, err := NewRefreshToken(user.uuid)
+	uid, err := refresh.UserID()
 	if err != nil {
-		return err
+		return errors.Wrap(err, "could not get userid from new refresh token")
 	}
 
-	refreshType := storage.NewRefreshTokenModel(user.uuid, refresh, *refreshExp)
-	err = s.store.CreateRefreshToken(refreshType)
+	refreshModel := storage.NewRefreshTokenModel(uid, refresh.Encrypted, refresh.Expiration)
+	err = s.store.CreateRefreshToken(refreshModel)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "could not write new refresh token to db")
 	}
 
-	/*
-		Set-Cookie: access_token=eyJ…; HttpOnly; Secure
-		Set-Cookie: refresh_token=…; Max-Age=31536000; Path=/api/auth/refresh; HttpOnly; Secure
-
-	*/
-	//add cookie
-	tokenC := new(http.Cookie)
-	tokenC.Name = "token"
-	tokenC.Value = token
-	tokenC.Expires = *tokenExp
-	tokenC.HttpOnly = true
-	tokenC.Secure = true
+	tokenC := access.AddToCookie()
 	c.SetCookie(tokenC)
 
-	tokenExpC := new(http.Cookie)
-	tokenExpC.Name = "token-expires"
-	tokenExpC.Value = tokenExp.String()
-	c.SetCookie(tokenExpC)
-
-	refreshC := new(http.Cookie)
-	refreshC.Name = "refresh"
-	refreshC.Path = "token/refresh"
-	refreshC.Value = refresh
-	refreshC.Expires = *refreshExp
-	refreshC.HttpOnly = true
-	refreshC.Secure = true
+	refreshC := refresh.AddToCookie()
 	c.SetCookie(refreshC)
-
-	refreshExpC := new(http.Cookie)
-	refreshExpC.Name = "refresh-expires"
-	refreshExpC.Value = refreshExp.String()
-	c.SetCookie(refreshExpC)
 
 	return nil
 }
 
 func (s *HandlerSession) handlePostLogout(c echo.Context) error {
-	cookie := new(http.Cookie)
-	cookie.Name = "token"
-	cookie.Value = "delete"
-	cookie.MaxAge = -1
+	// delete refresh token from db
+	refresh, err := c.Cookie("refresh")
+	if err == nil && refresh != nil {
+		err = s.store.DeleteRefreshTokenByToken(refresh.Value)
+		if err != nil {
+			fmt.Printf("did not delete refresh token from db: %v\n", err)
+		}
+	}
 
-	c.SetCookie(cookie)
+	clearCookie("token", c)
+	clearCookie("refresh", c)
+
 	return s.redirectToLogin(c)
+}
+
+func clearCookie(name string, c echo.Context) {
+	cookie := new(http.Cookie)
+	cookie.Name = name
+	cookie.MaxAge = -1
+	c.SetCookie(cookie)
 }
 
 func (s *HandlerSession) handleGetRecovery(c echo.Context) error {

@@ -12,6 +12,11 @@ require (
 )
 
 require (
+	github.com/go-test/deep v1.1.1 // indirect
+	github.com/pkg/errors v0.9.1 // indirect
+)
+
+require (
 	aidanwoods.dev/go-result v0.3.1 // indirect
 	github.com/a-h/parse v0.0.0-20250122154542-74294addb73e // indirect
 	github.com/andybalholm/brotli v1.1.0 // indirect

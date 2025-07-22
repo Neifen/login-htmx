@@ -3,9 +3,8 @@ package server
 import (
 	// "crypto"
 	"bytes"
-	"errors"
 
-	"golang.org/x/crypto/sha3"
+	"github.com/neifen/htmx-login/api/crypto"
 )
 
 const (
@@ -23,7 +22,7 @@ func (s *HandlerSession) Authenticate(email, pw string) *userReq {
 		return emptyUser()
 	}
 
-	pwHash, err := HashPassword(pw)
+	pwHash, err := crypto.HashPassword(pw)
 	if err != nil {
 		return emptyUser()
 	}
@@ -34,15 +33,4 @@ func (s *HandlerSession) Authenticate(email, pw string) *userReq {
 	}
 
 	return emptyUser()
-}
-
-func HashPassword(pw string) ([]byte, error) {
-	sh := sha3.New256()
-	_, errSh := sh.Write([]byte(pw))
-
-	if errSh != nil {
-		return nil, errors.New("could not hash password")
-	}
-
-	return sh.Sum(nil), nil
 }

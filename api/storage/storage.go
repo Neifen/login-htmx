@@ -18,7 +18,8 @@ type Storage interface {
 	UpdateUser(u *UserModel) error
 
 	CreateRefreshToken(t *RefreshTokenModel) error
-	DeleteRefreshToken(t *RefreshTokenModel) error
+	DeleteRefreshToken(t* RefreshTokenModel) error
+	DeleteRefreshTokenByToken(token string) error
 	ReadRefreshTokenByToken(token string) (*RefreshTokenModel, error)
 }
 
@@ -175,10 +176,18 @@ func (pg *PostgresStore) CreateRefreshToken(t *RefreshTokenModel) error {
 	return nil
 }
 
-func (pg *PostgresStore) DeleteRefreshToken(t *RefreshTokenModel) error {
-	_, err := pg.db.Query("DELETE FROM refresh_token rt where rt.id = $1", t.id)
+func (pg *PostgresStore) DeleteRefreshToken(t* RefreshTokenModel) error {
+	_, err := pg.db.Query("DELETE FROM refresh_tokens rt where rt.id = $1", t.id)
 	if err != nil {
 		return fmt.Errorf("db error 620: could not delete refresh_token %v", t.id)
+	}
+	return nil
+}
+
+func (pg *PostgresStore) DeleteRefreshTokenByToken(token string) error {
+	_, err := pg.db.Query("DELETE FROM refresh_tokens rt where rt.token = $1", token)
+	if err != nil {
+		return fmt.Errorf("db error 621: could not delete refresh_token %v", token)
 	}
 	return nil
 }

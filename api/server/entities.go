@@ -2,13 +2,14 @@ package server
 
 import (
 	"github.com/labstack/echo/v4"
+	"github.com/neifen/htmx-login/api/crypto"
 	"github.com/neifen/htmx-login/api/storage"
 )
 
 type userReq struct {
-	isLoggedIn     bool
-	name           string
-	uuid           string
+	isLoggedIn bool
+	name       string
+	uuid       string
 }
 
 func emptyUser() *userReq {
@@ -29,17 +30,17 @@ func userFromToken(c echo.Context) *userReq {
 		return emptyUser()
 	}
 
-	token, err := CheckToken(cookie.Value)
+	token, err := crypto.ValidTokenFromCookies(cookie)
 	if err != nil {
 		return emptyUser()
 	}
 
-	uid, err := token.GetString("user-id")
+	uid, err := token.UserID()
 	if err != nil {
 		return emptyUser()
 	}
 
-	name, _ := token.GetString("user-name")
+	name, _ := token.UserName()
 
 	return &userReq{isLoggedIn: true, name: name, uuid: uid}
 }
