@@ -75,10 +75,11 @@ func TestNewRefreshTokenModel(t *testing.T) {
 	uid := "asdf"
 	token := "testToken"
 	exp := time.Now()
+	remember := true
 
-	wantTokenModel := &RefreshTokenModel{UserUid: uid, Token: token, Expiration: exp}
+	wantTokenModel := &RefreshTokenModel{UserUid: uid, Token: token, Expiration: exp, Remember: remember}
 
-	tokenModel := NewRefreshTokenModel(uid, token, exp)
+	tokenModel := NewRefreshTokenModel(uid, token, exp, remember)
 
 	if !reflect.DeepEqual(tokenModel, wantTokenModel) {
 		t.Errorf(`NewRefreshTokenModel(%q, %q, %q). UserModel.Name should be %+v but was %+v`, uid, token, exp, wantTokenModel, tokenModel)
@@ -92,7 +93,7 @@ func TestNewRefreshTokenModelEmpty(t *testing.T) {
 
 	wantTokenModel := &RefreshTokenModel{UserUid: uid, Token: token, Expiration: exp}
 
-	tokenModel := NewRefreshTokenModel(uid, token, exp)
+	tokenModel := NewRefreshTokenModel(uid, token, exp, false)
 
 	if !reflect.DeepEqual(tokenModel, wantTokenModel) {
 		t.Errorf(`NewRefreshTokenModel(%q, %q, %q). UserModel.Name should be %+v but was %+v`, uid, token, exp, wantTokenModel, tokenModel)

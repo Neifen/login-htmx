@@ -4,7 +4,7 @@ templ Home(name string) {
 	<h2 class="text-2xl font-bold text-gray-800 mb-6">Welcome, { name }!</h2>
 	<p class="text-sm text-gray-600 mb-6">You are now logged in.</p>
 	<button 
-		hx-post="/logout"
+		hx-post="/token/logout"
 		hx-confirm="Are you sure you want to log out?"
 		hx-target="#base"
 		type="button" 
@@ -12,4 +12,8 @@ templ Home(name string) {
 	>
 		Log Out
 	</button>
+	<br/>
+	<div>
+		@Random()
+	</div>
 }

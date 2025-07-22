@@ -21,3 +21,10 @@ func (s *HandlerSession) redirectToHome(c echo.Context, user *userReq) error {
 	child := view.Home(user.name)
 	return view.ReplaceUrl(HOME_PATH, c, child)
 }
+
+func (s *HandlerSession) handleRandom(c echo.Context) error {
+	// u:= c.Get("u").(*userReq)
+
+	child := view.Random()
+	return view.RenderView(c, child)
+}

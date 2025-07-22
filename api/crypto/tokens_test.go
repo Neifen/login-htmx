@@ -209,7 +209,7 @@ func TestAddAccessTokenToCookie(t *testing.T) {
 
 	cookie := access.AddToCookie()
 
-	expectePathLen := 0
+	expectePath := "/"
 	expectExp := time.Now().Add(2 * time.Hour)
 
 	if !timeAlmostEqual(expectExp, cookie.Expires) {
@@ -224,7 +224,7 @@ func TestAddAccessTokenToCookie(t *testing.T) {
 		t.Errorf(`NewAccessToken(%q, %q).AddToCookie.HttpOnly = %v, expected true`, uid, name, cookie.HttpOnly)
 	}
 
-	if expectePathLen != len(cookie.Path) {
+	if expectePath != cookie.Path {
 		t.Errorf(`NewAccessToken(%q, %q).AddToCookie.Path = %v, expected an empty path`, uid, name, cookie.Path)
 	}
 
@@ -241,11 +241,15 @@ func TestAddAccessTokenToCookie(t *testing.T) {
 	// from
 	tokenFromCookie, err := ValidTokenFromCookies(cookie)
 	if err != nil {
-		t.Fatalf(`ValidSynmTokenFromCookies(%v) failed with the following error %v`, cookie, err)
+		t.Fatalf(`ValidTokenFromCookies(%v) failed with the following error %v`, cookie, err)
+	}
+
+	if !timeAlmostEqual(tokenFromCookie.Expiration, access.Expiration) {
+		t.Errorf(`ValidTokenFromCookies().Expiration = %v, expected: %v`, tokenFromCookie.Expiration, access.Expiration)
 	}
 
 	diffs = deep.Equal(tokenFromCookie, access)
-	if len(diffs) != 0 {
+	if len(diffs) != 1 { //Expiration should be different
 		t.Errorf(`ValidSynmTokenFromCookies(%v) was different from original token, with the following diffs: %v`, tokenFromCookie, diffs)
 	}
 }
@@ -263,7 +267,7 @@ func TestAddRefreshTokenToCookie(t *testing.T) {
 
 	cookie := refresh.AddToCookie()
 
-	expectePath := "token/refresh"
+	expectePath := "/token"
 	expectExp := time.Now().Add(7 * 24 * time.Hour)
 
 	if !timeAlmostEqual(expectExp, cookie.Expires) {
@@ -279,7 +283,7 @@ func TestAddRefreshTokenToCookie(t *testing.T) {
 	}
 
 	if expectePath != cookie.Path {
-		t.Errorf(`NewAccessToken(%q, %q).AddToCookie.Path = %v, expected an empty path`, uid, name, cookie.Path)
+		t.Errorf(`NewAccessToken(%q, %q).AddToCookie.Path = %v, expected %v`, uid, name, cookie.Path, expectePath)
 	}
 
 	token, err := paseto.Parser.ParseV4Local(paseto.NewParser(), symKey, cookie.Value, nil)
@@ -298,8 +302,12 @@ func TestAddRefreshTokenToCookie(t *testing.T) {
 		t.Fatalf(`ValidSynmTokenFromCookies(%v) failed with the following error %v`, cookie, err)
 	}
 
+	if !timeAlmostEqual(tokenFromCookie.Expiration, refresh.Expiration) {
+		t.Errorf(`ValidTokenFromCookies().Expiration = %v, expected: %v`, tokenFromCookie.Expiration, refresh.Expiration)
+	}
+
 	diffs = deep.Equal(tokenFromCookie, refresh)
-	if len(diffs) != 0 {
+	if len(diffs) != 1 { //Expiration should be different
 		t.Errorf(`ValidSynmTokenFromCookies(%v) was different from original token, with the following diffs: %v`, tokenFromCookie, diffs)
 	}
 }
@@ -316,7 +324,7 @@ func TestAddRefreshTokenStayLoggedInToAndFromCookie(t *testing.T) {
 	}
 	cookie := refresh.AddToCookie()
 
-	expectePath := "token/refresh"
+	expectePath := "/token"
 	expectExp := time.Now().Add(40 * 24 * time.Hour)
 
 	if !timeAlmostEqual(expectExp, cookie.Expires) {
@@ -332,7 +340,7 @@ func TestAddRefreshTokenStayLoggedInToAndFromCookie(t *testing.T) {
 	}
 
 	if expectePath != cookie.Path {
-		t.Errorf(`NewAccessToken(%q, %q).AddToCookie.Path = %v, expected an empty path`, uid, name, cookie.Path)
+		t.Errorf(`NewAccessToken(%q, %q).AddToCookie.Path = %v, expected %q`, uid, name, cookie.Path, expectePath)
 	}
 
 	token, err := paseto.Parser.ParseV4Local(paseto.NewParser(), symKey, cookie.Value, nil)
@@ -351,8 +359,12 @@ func TestAddRefreshTokenStayLoggedInToAndFromCookie(t *testing.T) {
 		t.Fatalf(`ValidSynmTokenFromCookies(%v) failed with the following error %v`, cookie, err)
 	}
 
+	if !timeAlmostEqual(tokenFromCookie.Expiration, refresh.Expiration) {
+		t.Errorf(`ValidTokenFromCookies().Expiration = %v, expected: %v`, tokenFromCookie.Expiration, refresh.Expiration)
+	}
+
 	diffs = deep.Equal(tokenFromCookie, refresh)
-	if len(diffs) != 0 {
+	if len(diffs) != 1 { //Expiration should be different
 		t.Errorf(`ValidSynmTokenFromCookies(%v) was different from original token, with the following diffs: %v`, tokenFromCookie, diffs)
 	}
 }

@@ -48,13 +48,13 @@ func (t *Token) AddToCookie() *http.Cookie {
 	tCookie := new(http.Cookie)
 	tCookie.Value = t.Encrypted
 	tCookie.Expires = t.Expiration
-	// tCookie.HttpOnly = true
-	// tCookie.Secure = true
+	tCookie.HttpOnly = true
+	tCookie.Secure = true
 	tCookie.Name = "token"
 	tCookie.Path = "/"
 	if t.refresh {
 		tCookie.Name = "refresh"
-		tCookie.Path = "/token/refresh"
+		tCookie.Path = "/token"
 	}
 	return tCookie
 
@@ -85,6 +85,8 @@ func ValidTokenFromCookies(cookie *http.Cookie) (*Token, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "token invalid (expiration: %s)", cookie.Expires)
 	}
+
+	// token.GetExpiration loses some very detailed info, but cookie doesn't seem to have them at all
 	exp, err := token.GetExpiration()
 	if err != nil {
 		return nil, errors.Wrapf(err, "token without expiration date")
@@ -118,14 +120,14 @@ func NewAccessToken(uid, name string) (*Token, error) {
 	}, nil
 }
 
-func NewRefreshToken(uid, name string, stayloggedin bool) (*Token, error) {
+func NewRefreshToken(uid, name string, remember bool) (*Token, error) {
 	token := paseto.NewToken()
 
 	token.SetIssuedAt(time.Now())
 	token.SetNotBefore(time.Now())
 
 	addTime := 7 * 24 * time.Hour
-	if stayloggedin {
+	if remember {
 		addTime = 40 * 24 * time.Hour
 	}
 

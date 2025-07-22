@@ -11,28 +11,31 @@ templ Base(errMsgs, sucMsgs []string) {
         <script src="https://cdn.tailwindcss.com"></script>
         <script src="/static/js/htmx.min.js"></script>
         <script type="text/javascript">
-            document.body.addEventListener('htmx:responseError', function(event) {
-                console.log("error");
-            if (event.detail.xhr.status === 401) {
-                console.log("401 oh oh");
-                // Refresh the session
-                fetch('token/refresh', {
-                method: 'POST',
-                headers: {
-                    'rid': 'session'
+            window.addEventListener("DOMContentLoaded", (event) => {
+                document.body?.addEventListener('htmx:responseError', function(event) {
+                if (event.detail.xhr.status === 401) {
+                    console.log("not authorized");
+                    // Refresh the session
+                    fetch('token/refresh', {
+                        method: 'POST',
+                        headers: {
+                            'rid': 'session'
+                        }
+                    })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('Network response was not ok');
+                        } else {
+                            // Retry the original request
+                            const eventType = event.detail.requestConfig.triggeringEvent.type;
+                            htmx.trigger(event.detail.elt, eventType);
+                        }
+                    })
+                    .catch(error => {
+                    throw new Error(`There has been a problem with refreshing the session: ${error}`);
+                    });
                 }
-                })
-                .then(response => {
-                if (!response.ok) {
-                    throw new Error('Network response was not ok');
-                }
-                // Retry the original request
-                htmx.trigger(event.target, 'htmx:confirm');
-                })
-                .catch(error => {
-                throw new Error(`There has been a problem with refreshing the session: ${error}`);
                 });
-            }
             });
   </script>
     </head>

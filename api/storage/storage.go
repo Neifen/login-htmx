@@ -18,7 +18,7 @@ type Storage interface {
 	UpdateUser(u *UserModel) error
 
 	CreateRefreshToken(t *RefreshTokenModel) error
-	DeleteRefreshToken(t* RefreshTokenModel) error
+	DeleteRefreshToken(t *RefreshTokenModel) error
 	DeleteRefreshTokenByToken(token string) error
 	ReadRefreshTokenByToken(token string) (*RefreshTokenModel, error)
 }
@@ -75,6 +75,7 @@ func NewPostGresStore() (*PostgresStore, error) {
 	id SERIAL PRIMARY KEY,
 	user_uid varchar not null,
 	token varchar not null,
+	remember boolean DEFAULT false,
 	expires timestamptz not null,
 	created_at timestamptz not null default now(),
 	updated_at timestamptz not null default now()
@@ -166,7 +167,7 @@ func (pg *PostgresStore) ReadUserByUid(uid string) (*UserModel, error) {
 
 func (pg *PostgresStore) CreateRefreshToken(t *RefreshTokenModel) error {
 	var id int //dont really need it
-	row := pg.db.QueryRow("INSERT INTO refresh_tokens(user_uid, token, expires) VALUES ($1, $2, $3) RETURNING id", t.UserUid, t.Token, t.Expiration)
+	row := pg.db.QueryRow("INSERT INTO refresh_tokens(user_uid, token, expires, remember) VALUES ($1, $2, $3, $4) RETURNING id", t.UserUid, t.Token, t.Expiration, t.Remember)
 	err := row.Scan(&id)
 
 	if err != nil {
@@ -176,7 +177,7 @@ func (pg *PostgresStore) CreateRefreshToken(t *RefreshTokenModel) error {
 	return nil
 }
 
-func (pg *PostgresStore) DeleteRefreshToken(t* RefreshTokenModel) error {
+func (pg *PostgresStore) DeleteRefreshToken(t *RefreshTokenModel) error {
 	_, err := pg.db.Query("DELETE FROM refresh_tokens rt where rt.id = $1", t.id)
 	if err != nil {
 		return fmt.Errorf("db error 620: could not delete refresh_token %v", t.id)
@@ -193,14 +194,15 @@ func (pg *PostgresStore) DeleteRefreshTokenByToken(token string) error {
 }
 
 func (pg *PostgresStore) ReadRefreshTokenByToken(token string) (*RefreshTokenModel, error) {
-	row := pg.db.QueryRow("SELECT id, user_uid, token, expires from refresh_tokens where token = $1", token)
+	row := pg.db.QueryRow("SELECT id, user_uid, token, expires, remember from refresh_tokens where token = $1", token)
 
 	var id int
 	var tokenRes string
 	var userUid string
 	var expiration time.Time
+	var remember bool
 
-	err := row.Scan(&id, &userUid, &tokenRes, &expiration)
+	err := row.Scan(&id, &userUid, &tokenRes, &expiration, &remember)
 	if err != nil {
 		return nil, fmt.Errorf("db error 630: could not read refresh_token %s", token)
 	}
@@ -210,5 +212,6 @@ func (pg *PostgresStore) ReadRefreshTokenByToken(token string) (*RefreshTokenMod
 		Token:      tokenRes,
 		UserUid:    userUid,
 		Expiration: expiration,
+		Remember:   remember,
 	}, nil
 }

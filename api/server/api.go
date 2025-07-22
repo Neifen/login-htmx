@@ -11,13 +11,14 @@ import (
 const (
 	LOGIN_PATH    string = "/login"
 	SIGNUP_PATH   string = "/signup"
-	LOGOUT_PATH   string = "/logout"
 	RECOVERY_PATH string = "/recovery"
 
+	LOGOUT_PATH  string = "/token/logout" //to be able to access refresh token
 	REFRESH_PATH string = "/token/refresh"
 
 	HOME_PATH           string = "/"
 	HOME_SECONDARY_PATH string = "/home"
+	RANDOM_PATH         string = "/random"
 )
 
 type APIServer struct {
@@ -54,6 +55,7 @@ func (api *APIServer) Run() {
 	//e.Use(pasetoMiddle())
 	e.GET(HOME_PATH, s.handleGetHome, pasetoMiddle())
 	e.GET(HOME_SECONDARY_PATH, s.handleGetHome, pasetoMiddle())
+	e.GET(RANDOM_PATH, s.handleRandom, pasetoMiddle())
 
 	e.Logger.Fatal(e.Start(api.apiPath))
 }

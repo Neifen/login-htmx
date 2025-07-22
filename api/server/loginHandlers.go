@@ -40,10 +40,11 @@ func (s *HandlerSession) handlePostLogin(c echo.Context) error {
 
 	email := c.FormValue("email")
 	pw := c.FormValue("password")
+	remember := c.FormValue("remember") == "on"
 
 	userReq := s.Authenticate(email, pw)
 	if userReq.isLoggedIn {
-		err := s.createAndHandleTokens(userReq, c)
+		err := s.createAndHandleTokens(userReq, c, remember)
 
 		if err == nil {
 			return s.redirectToHome(c, userReq)
@@ -109,7 +110,7 @@ func (s *HandlerSession) subHandleTokenRefresh(c echo.Context) error {
 		return errors.Wrapf(err, "user invalid")
 	}
 
-	err = s.createAndHandleTokens(userFromModel(user), c)
+	err = s.createAndHandleTokens(userFromModel(user), c, refreshType.Remember)
 	if err != nil {
 		return errors.Wrapf(err, "creating new tokens failed")
 	}
@@ -137,12 +138,12 @@ func redirectToTokenRefresh(c echo.Context) error {
 	return c.String(http.StatusUnauthorized, "Unauthorized")
 }
 
-func (s *HandlerSession) createAndHandleTokens(user *userReq, c echo.Context) error {
+func (s *HandlerSession) createAndHandleTokens(user *userReq, c echo.Context, remember bool) error {
 	access, err := crypto.NewAccessToken(user.uuid, user.name)
 	if err != nil {
 		return errors.Wrap(err, "could not generate access token")
 	}
-	refresh, err := crypto.NewRefreshToken(user.uuid, user.name, false)
+	refresh, err := crypto.NewRefreshToken(user.uuid, user.name, remember)
 	if err != nil {
 		return errors.Wrap(err, "could not generate refresh token")
 	}
@@ -152,7 +153,7 @@ func (s *HandlerSession) createAndHandleTokens(user *userReq, c echo.Context) er
 		return errors.Wrap(err, "could not get userid from new refresh token")
 	}
 
-	refreshModel := storage.NewRefreshTokenModel(uid, refresh.Encrypted, refresh.Expiration)
+	refreshModel := storage.NewRefreshTokenModel(uid, refresh.Encrypted, refresh.Expiration, remember)
 	err = s.store.CreateRefreshToken(refreshModel)
 	if err != nil {
 		return errors.Wrap(err, "could not write new refresh token to db")
@@ -177,15 +178,19 @@ func (s *HandlerSession) handlePostLogout(c echo.Context) error {
 		}
 	}
 
-	clearCookie("token", c)
-	clearCookie("refresh", c)
+	clearCookie("token", "/", c)
+	clearCookie("refresh", "/token", c)
 
 	return s.redirectToLogin(c)
 }
 
-func clearCookie(name string, c echo.Context) {
-	cookie := new(http.Cookie)
-	cookie.Name = name
+func clearCookie(name, path string, c echo.Context) {
+	cookie, err := c.Cookie(name)
+	if err != nil {
+		return
+	}
+	cookie.Value = ""
+	cookie.Path = path //very important
 	cookie.MaxAge = -1
 	c.SetCookie(cookie)
 }

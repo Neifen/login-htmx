@@ -1,0 +1,14 @@
+package view //import github.com/neifen/htmx-login/view
+
+import "github.com/kpechenenko/rword"
+
+templ Random() {
+	{{
+		word := "error"
+		g, err := rword.New()
+		if err == nil {
+			word = g.Word()
+		} 
+	}}
+	<p class="text-sm text-gray-600 mb-6" id="random">Random new word: {word} <button type="button" hx-get="/random" hx-swap="outerHTML" hx-target="#random" >🔃</button></p>
+}
